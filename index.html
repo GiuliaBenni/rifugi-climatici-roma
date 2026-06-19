@@ -643,7 +643,13 @@ const map = L.map('map', {
   zoomControl: true,
 });
 
-// Basemap OpenTopoMap
+// Pane dedicato per i poligoni (sopra basemap, sotto marker)
+map.createPane('poligoni');
+map.getPane('poligoni').style.zIndex = 350;
+map.createPane('marcatori');
+map.getPane('marcatori').style.zIndex = 450;
+
+// Basemap OpenStreetMap
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19,
@@ -841,7 +847,7 @@ async function loadLayer(id) {
 
       if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
 
-      const marker = L.marker([lat, lon], { icon })
+      const marker = L.marker([lat, lon], { icon, pane: 'marcatori' })
         .bindPopup(buildPopup(p), { maxWidth: 320 });
       group.addLayer(marker);
       count++;
@@ -888,7 +894,7 @@ async function loadRifugiChiuso() {
       const stile = TIPO_STYLE[tipo] || TIPO_DEFAULT;
       const icon = makeIcon(stile);
 
-      const marker = L.marker([lat, lon], { icon })
+      const marker = L.marker([lat, lon], { icon, pane: 'marcatori' })
         .bindPopup(buildPopup(p), { maxWidth: 320 });
 
       if (!markersByTipo[tipo]) markersByTipo[tipo] = [];
@@ -982,6 +988,7 @@ async function loadPolyLayer(id) {
 
     let count = 0;
     L.geoJSON(data, {
+      pane: 'poligoni',
       style: function(feature) {
         const v = feature.properties[cfg.campo];
         const vNum = (v !== null && v !== undefined) ? parseFloat(v) : NaN;
