@@ -773,13 +773,17 @@ const map = L.map('map', {
   zoomControl: true,
 });
 
+// Gruppo chiuso dichiarato prima dei pane
+const gruppoChiuso = L.layerGroup();
+const markersByTipo = {};
+
 // Pane dedicato per i poligoni (sopra basemap, sotto marker)
 map.createPane('poligoni');
 map.getPane('poligoni').style.zIndex = 350;
 map.createPane('marcatori');
 map.getPane('marcatori').style.zIndex = 450;
 
-// Aggiunge subito il gruppo chiuso alla mappa (i marker vengono popolati dopo)
+// Aggiunge subito il gruppo chiuso alla mappa
 gruppoChiuso.addTo(map);
 
 // Basemap OpenStreetMap
@@ -884,6 +888,14 @@ function makePinIcon(svgHtml) {
     iconAnchor: [14, 37],
     popupAnchor: [0, -38],
   });
+}
+
+// Cache icone pre-calcolate: una per tipo, non una per marker
+const ICON_CACHE = {};
+
+function getCachedIcon(key, factoryFn) {
+  if (!ICON_CACHE[key]) ICON_CACHE[key] = factoryFn();
+  return ICON_CACHE[key];
 }
 
 // Icona piccola per fontanelle (punto colorato)
@@ -1043,7 +1055,9 @@ async function loadLayer(id) {
   const group = L.layerGroup();
   const smallSize = SMALL_LAYERS[id];
   const pinSvg = PIN_SVGS_LAYER[id];
-  const icon = smallSize ? makeSmallIcon(cfg.color, smallSize) : (pinSvg ? makePinIcon(pinSvg) : makeIcon(cfg));
+  const icon = getCachedIcon(id, () =>
+    smallSize ? makeSmallIcon(cfg.color, smallSize) : (pinSvg ? makePinIcon(pinSvg) : makeIcon(cfg))
+  );
 
   try {
     const resp = await fetch(cfg.file);
@@ -1088,9 +1102,6 @@ async function loadLayer(id) {
 }
 
 // ── CARICAMENTO LAYER AL CHIUSO (file unico, marker per Tipo) ─────
-const gruppoChiuso = L.layerGroup();
-const markersByTipo = {};
-
 async function loadRifugiChiuso() {
   try {
     const resp = await fetch('rifugi_chiuso.geojson');
@@ -1113,8 +1124,10 @@ async function loadRifugiChiuso() {
       if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
 
       const tipo = val(p.Tipo) || '';
-      const pinSvg = PIN_SVGS[tipo];
-      const icon = pinSvg ? makePinIcon(pinSvg) : (() => { const stile = TIPO_STYLE[tipo] || TIPO_DEFAULT; return makeIcon(stile); })();
+      const icon = getCachedIcon('chiuso_' + tipo, () => {
+        const pinSvg = PIN_SVGS[tipo];
+        return pinSvg ? makePinIcon(pinSvg) : makeIcon(TIPO_STYLE[tipo] || TIPO_DEFAULT);
+      });
 
       const marker = L.marker([lat, lon], { icon, pane: 'marcatori' })
         .bindPopup(buildPopup(p), { maxWidth: 320 });
